@@ -1,0 +1,10 @@
+resources:
+  - ../../../base/bookmark-api
+
+patches:
+  - target:
+      kind: Deployment
+      name: bookmark-api
+    path: patch-image.yaml
+
+namespace: bookmark

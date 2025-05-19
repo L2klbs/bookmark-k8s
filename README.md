@@ -1,68 +1,64 @@
 # bookmark-k8s
 
-Kustomize-based Kubernetes manifests for deploying bookmark related services and its supporting infrastructure.
+This repo contains the Kubernetes manifests for deploying the bookmark-api and bookmark-ui services. It uses Kustomize to manage per-environment configuration and supports GitOps-style deployment.
 
-This repo follows a GitOps model: changes to manifests are automatically picked up and deployed by ArgoCD in configured environments (e.g. QA, Prod).
-
-## Deploying with ArgoCD
-
-Ensure ArgoCD is installed in your cluster (via Helm or manifests). Then apply the app definition:
-
-```bash
-helm repo add argo https://argoproj.github.io/argo-helm
-helm repo update
-kubectl create namespace argocd
-helm install argocd argo/argo-cd -n argocd
-kubectl apply -f apps/bookmark-api-qa.yaml -n argocd
+### Structure
+```basn
+bookmark-k8s/
+├── base/
+│   ├── bookmark-api/
+│   └── bookmark-ui/
+├── overlays/
+│   ├── qa/
+│   │   ├── bookmark-api/
+│   │   └── bookmark-ui/
+│   ├── stage/
+│   ├── prod/
 ```
 
-ArgoCD will track the overlays/qa path and deploy any changes pushed to this repo.
-
-### Auto-Sync
-
-This repo assumes ArgoCD is set to automatically sync updates for QA. If you're using manual sync for Prod, use the CLI:
-
-argocd app sync bookmark-api-prod
-
-## PostgreSQL Setup (Bitnami Helm Chart)
-
-Note: The following values are examples. You should update the username, password, and database name before deploying to a shared or production cluster.
-
-This project uses PostgreSQL deployed inside the cluster using the Bitnami Helm chart.
-
-### Install Steps
+### Local Testing with Minikube
 
 ```bash
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update
-
-kubectl create namespace bookmark-db
-
-helm install postgres bitnami/postgresql \
-  --namespace bookmark-db \
-  --set auth.username=bookmark \
-  --set auth.password=bookmarkpass \
-  --set auth.database=bookmark
-
-### Connect inside cluster
-
-kubectl run pg-client --rm -it --restart=Never --namespace bookmark-db \
-  --image=bitnami/postgresql:latest \
-  --env="PGPASSWORD=bookmarkpass" \
-  --command -- psql -h postgres-postgresql -U bookmark -d bookmark
-
-### Connection URL (for .env)
-
-DATABASE_URL=postgresql+asyncpg://bookmark:bookmarkpass@postgres-postgresql.bookmark-db.svc.cluster.local:5432/bookmark
-
-### Port Forward (for local access)
-
-kubectl port-forward -n bookmark-db svc/postgres-postgresql 5432:5432
-
-# Use this connection string instead:
-DATABASE_URL=postgresql+asyncpg://bookmark:bookmarkpass@localhost:5432/bookmark
+# Start Minikube and enable tunneling:
+minikube start
+minikube tunnel
 ```
 
-## Maintainer
+Update /etc/hosts with your local domains:
 
-@L2klbs
+```bash
+# /etc/hosts
+127.0.0.1 api.bookmark.local
+127.0.0.1 ui.bookmark.local
+```
+
+Deploy the QA environment:
+
+```bash
+kubectl apply -k overlays/qa/
+```
+
+Your API should be available at: http://api.bookmark.local</br>
+Your UI should be available at: http://ui.bookmark.local
+
+### Services and Ports
+
+bookmark-api: listens on port 8000 (internally), exposed through a ClusterIP service on port 80
+
+bookmark-ui: assumed to be served via a web server on port 80
+
+### Ingress
+
+Ingress is configured with NGINX to route external traffic to internal services based on subdomain:
+
+api.bookmark.local → bookmark-api
+
+ui.bookmark.local → bookmark-ui
+
+### Secrets
+
+Secrets are used to configure environment-specific values like DATABASE_URL. These are stored in Kubernetes as base64-encoded values and injected into the app at runtime.
+
+Helm Dependencies (see bookmark-infra)
+
+Some components (like Ingress and TLS) are installed via Helm in a separate repo: `bookmark-infra`

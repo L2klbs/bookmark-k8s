@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bookmark-api
+  namespace: bookmark
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.bookmark.local
+      secretName: bookmark-api-tls
+  rules:
+    - host: api.bookmark.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: bookmark-api
+                port:
+                  number: 80

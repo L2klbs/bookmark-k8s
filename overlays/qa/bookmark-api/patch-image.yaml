@@ -1,0 +1,10 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bookmark-api
+spec:
+  template:
+    spec:
+      containers:
+        - name: bookmark-api
+          image: ghcr.io/l2klbs/bookmark-api:qa-a77546a
